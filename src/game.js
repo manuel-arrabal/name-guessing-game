@@ -11,7 +11,12 @@ function randomItem(arr) {
 }
 
 function shuffle(arr) {
-  return arr.sort(() => Math.random() - 0.5);
+  const shuffled = [...arr]; // Create a copy
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
 }
 
 // Initialize the game after data is loaded
@@ -94,8 +99,13 @@ function generatePopularNameQuestion(attempts = 0) {
 
   currentQuestion.options.forEach((opt,i) => {
     const btn = document.getElementById(`option${i}`);
-    btn.innerText = opt.name;
-    btn.style.display = 'inline-block';
+    if (btn && opt && opt.name) {
+      btn.innerText = opt.name;
+      btn.style.display = 'inline-block';
+    } else {
+      console.error(`Invalid option at index ${i}:`, opt);
+      btn.style.display = 'none';
+    }
   });
 
   document.getElementById('feedback').innerText = '';
@@ -109,30 +119,118 @@ function generateMostPopularYearQuestion(attempts = 0) {
     return;
   }
   
-  const names = [...new Set(namesData.map(d => d.name))];
+  const names = [...new Set(namesData.map(d => d.name).filter(n => n && n.trim() !== ''))];
+  if (names.length === 0) {
+    console.error('No valid names found in data');
+    return;
+  }
   const name = randomItem(names);
-  const pool = namesData.filter(d => d.name === name);
+  if (!name || name.trim() === '') {
+    return generateMostPopularYearQuestion(attempts + 1);
+  }
+  const pool = namesData.filter(d => d.name === name && d.year && !isNaN(d.year));
   
   if (pool.length < 3) return generateMostPopularYearQuestion(attempts + 1);
   
   const correct = pool.reduce((a,b) => a.count > b.count ? a : b);
   
+  // Validate correct answer
+  if (!correct || !correct.year || isNaN(correct.year)) {
+    console.error('Invalid correct answer:', correct);
+    return generateMostPopularYearQuestion(attempts + 1);
+  }
+  
   // Get other years for this name, excluding the correct one
-  const otherYears = pool.filter(d => d.year !== correct.year);
+  const otherYears = pool.filter(d => d.year !== correct.year && d.year && !isNaN(d.year));
   if (otherYears.length < 2) return generateMostPopularYearQuestion(attempts + 1);
   
-  const options = shuffle([correct, randomItem(otherYears), randomItem(otherYears)]);
+  // Ensure we have unique years for options
+  const uniqueYears = [...new Set(otherYears.map(d => d.year).filter(y => !isNaN(y) && y > 0))];
+  if (uniqueYears.length < 2) {
+    console.log('Not enough unique years:', uniqueYears);
+    return generateMostPopularYearQuestion(attempts + 1);
+  }
+  
+  // Get first occurrence of each unique year
+  const year1 = otherYears.find(d => d.year === uniqueYears[0] && d.year && !isNaN(d.year));
+  const year2 = otherYears.find(d => d.year === uniqueYears[1] && d.year && !isNaN(d.year));
+  
+  console.log('Selected years:', { 
+    uniqueYears, 
+    year1: year1 ? { year: year1.year, full: year1 } : null,
+    year2: year2 ? { year: year2.year, full: year2 } : null,
+    correct: { year: correct.year, full: correct }
+  });
+  
+  if (!year1 || !year1.year || isNaN(year1.year) || !year2 || !year2.year || isNaN(year2.year)) {
+    console.error('Invalid year options:', { year1, year2, uniqueYears });
+    return generateMostPopularYearQuestion(attempts + 1);
+  }
+  
+  // Validate all three options before shuffling
+  if (!correct || !correct.year || isNaN(correct.year)) {
+    console.error('Invalid correct option:', correct);
+    return generateMostPopularYearQuestion(attempts + 1);
+  }
+  
+  const options = shuffle([correct, year1, year2]);
+  
+  // Final validation of options
+  options.forEach((opt, idx) => {
+    if (!opt || !opt.year || isNaN(opt.year)) {
+      console.error(`Invalid option after shuffle at index ${idx}:`, opt);
+    }
+  });
   currentQuestion = { type:'mostPopularYear', name, correct, options };
 
-  document.getElementById('question').innerText = formatString(
+  if (!name || name.trim() === '') {
+    console.error('Name is empty or undefined');
+    return generateMostPopularYearQuestion(attempts + 1);
+  }
+  
+  console.log('Generated question:', { 
+    name, 
+    nameType: typeof name,
+    correct: correct.year, 
+    correctObj: correct,
+    options: options.map(o => ({ year: o.year, fullObj: o }))
+  });
+
+  // Validate name before using it
+  if (!name || String(name).trim() === '' || name === '0') {
+    console.error('Invalid name value:', name);
+    return generateMostPopularYearQuestion(attempts + 1);
+  }
+
+  const questionText = formatString(
     UI_STRINGS.questionMostPopularYear,
-    { name }
+    { name: String(name) }
   );
+  document.getElementById('question').innerText = questionText;
 
   currentQuestion.options.forEach((opt,i) => {
     const btn = document.getElementById(`option${i}`);
-    btn.innerText = opt.year;
-    btn.style.display = 'inline-block';
+    if (!btn) {
+      console.error(`Button option${i} not found`);
+      return;
+    }
+    
+    if (!opt) {
+      console.error(`Option ${i} is null or undefined`);
+      btn.style.display = 'none';
+      return;
+    }
+    
+    const yearValue = opt.year;
+    console.log(`Option ${i}:`, { opt, yearValue, yearType: typeof yearValue });
+    
+    if (typeof yearValue !== 'undefined' && yearValue !== null && !isNaN(yearValue)) {
+      btn.innerText = String(yearValue);
+      btn.style.display = 'inline-block';
+    } else {
+      console.error(`Invalid year in option ${i}:`, { opt, yearValue });
+      btn.style.display = 'none';
+    }
   });
 
   document.getElementById('feedback').innerText = '';
