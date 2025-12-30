@@ -1,34 +1,31 @@
 // dataLoader.js
-// Load CSV into namesData array
-// English comments; Spanish front-end
+// English comments & code, loads CSV into namesData
 
-let namesData = [];
+let namesData = []; // This will store all the CSV rows
 
-function loadData() {
-  return fetch('data/names_2002_2023.csv')
-    .then(response => response.text())
-    .then(csvText => {
-      namesData = [];
-      const lines = csvText.trim().split('\n');
-      lines.shift(); // remove header
+async function loadData() {
+  try {
+    const response = await fetch('names_2002_2023.csv'); // Make sure the CSV file is in the same folder
+    const csvText = await response.text();
+    parseCSV(csvText);
+    console.log(`Loaded ${namesData.length} rows`);
+    return namesData;
+  } catch (err) {
+    console.error("Error loading CSV:", err);
+  }
+}
 
-      lines.forEach(line => {
-        const cols = line.split(',');
-        if (cols.length < 4) return;
-
-        const year = parseInt(cols[0].trim());
-        const gender = cols[1].trim();
-        const name = cols[2].trim();
-        const count = parseInt(cols[3].trim());
-
-        if (isNaN(year) || isNaN(count) || !name || !gender) return;
-
-        namesData.push({ year, gender, name, count });
-      });
-
-      console.log('Loaded records:', namesData.length);
-      console.log('First record:', namesData[0]);
-      return namesData;
-    })
-    .catch(err => console.error('Error loading CSV:', err));
+// Simple CSV parser
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',');
+  namesData = lines.slice(1).map(line => {
+    const parts = line.split(',');
+    return {
+      year: parseInt(parts[0]),
+      gender: parts[1],
+      name: parts[2],
+      count: parseInt(parts[3])
+    };
+  });
 }
