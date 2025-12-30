@@ -38,20 +38,57 @@ function parseCSV(text) {
   const headers = lines[0].split(',');
   namesData = lines.slice(1)
     .filter(line => line.trim().length > 0) // Skip empty lines
-    .map(line => {
+    .map((line, lineNum) => {
+      // Remove any BOM or special characters
+      line = line.replace(/^\uFEFF/, '');
+      
       const parts = line.split(',');
       if (parts.length !== 4) {
-        console.warn('Invalid CSV line:', line);
+        console.warn(`Invalid CSV line ${lineNum + 2} (expected 4 parts, got ${parts.length}):`, line);
         return null;
       }
+      
+      const yearStr = parts[0].trim();
+      const gender = parts[1].trim();
+      const name = parts[2].trim();
+      const countStr = parts[3].trim();
+      
+      const year = parseInt(yearStr, 10);
+      const count = parseInt(countStr, 10);
+      
+      // Validate all fields
+      if (isNaN(year) || isNaN(count) || !gender || !name || name.length === 0) {
+        console.warn(`Invalid data in line ${lineNum + 2}:`, { yearStr, gender, name, countStr, year, count });
+        return null;
+      }
+      
+      // Ensure name is a string, not a number
+      const nameStr = String(name);
+      if (nameStr === '0' || nameStr === '') {
+        console.warn(`Invalid name in line ${lineNum + 2}:`, name);
+        return null;
+      }
+      
       return {
-        year: parseInt(parts[0]),
-        gender: parts[1].trim(),
-        name: parts[2].trim(),
-        count: parseInt(parts[3])
+        year: year,
+        gender: gender,
+        name: nameStr,
+        count: count
       };
     })
-    .filter(item => item !== null && !isNaN(item.year) && !isNaN(item.count));
+    .filter(item => item !== null && 
+                   !isNaN(item.year) && 
+                   !isNaN(item.count) && 
+                   item.name && 
+                   item.name.trim().length > 0 &&
+                   item.name !== '0' &&
+                   item.gender &&
+                   item.year > 0 &&
+                   item.count > 0);
   
   console.log(`Parsed ${namesData.length} valid rows from CSV`);
+  if (namesData.length > 0) {
+    console.log('Sample data:', namesData[0]);
+    console.log('Sample name type:', typeof namesData[0].name);
+  }
 }
