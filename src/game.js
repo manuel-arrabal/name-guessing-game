@@ -1,12 +1,11 @@
 // game.js
 // English comments & code, Spanish front-end via ui.js
 
-let namesData = [];           // Array to store CSV data
-let currentQuestion = null;   // Current question object
-let score = 0;                // Correct answers count
-let totalQuestions = 0;       // Total questions asked
+// namesData is global, loaded from dataLoader.js
+let currentQuestion = null;
+let score = 0;
+let totalQuestions = 0;
 
-// Utility functions
 function randomItem(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -15,7 +14,7 @@ function shuffle(arr) {
   return arr.sort(() => Math.random() - 0.5);
 }
 
-// Load data (CSV already loaded in dataLoader.js)
+// Initialize the game after data is loaded
 function initGame() {
   if (!namesData || namesData.length === 0) {
     console.error("No data loaded");
@@ -23,11 +22,13 @@ function initGame() {
   }
   score = 0;
   totalQuestions = 0;
-  generateQuestion();
+
   // Attach button listeners
   for (let i = 0; i < 3; i++) {
     document.getElementById(`option${i}`).onclick = () => checkAnswer(i);
   }
+
+  generateQuestion();
 }
 
 // Generate random question type
@@ -40,7 +41,7 @@ function generateQuestion() {
   }
 }
 
-// Question: Which name was most popular in a given year?
+// Question: Most popular name in a given year
 function generatePopularNameQuestion() {
   const years = [...new Set(namesData.map(d => d.year))];
   const year = randomItem(years);
@@ -55,7 +56,7 @@ function generatePopularNameQuestion() {
 
   document.getElementById('question').innerText = formatString(
     UI_STRINGS.questionPopularName,
-    { year, gender: gender==='M'?UI_STRINGS.genderMale:UI_STRINGS.genderFemale }
+    { year }
   );
 
   options.forEach((opt,i) => {
@@ -65,7 +66,7 @@ function generatePopularNameQuestion() {
   document.getElementById('feedback').innerText = '';
 }
 
-// Question: Which year was a name most popular?
+// Question: Year in which a name was most popular
 function generateMostPopularYearQuestion() {
   const names = [...new Set(namesData.map(d => d.name))];
   const name = randomItem(names);
@@ -117,8 +118,5 @@ function checkAnswer(index) {
   setTimeout(generateQuestion, 1500);
 }
 
-// Initialize after data is loaded
-loadData().then(() => {
-  console.log("Data loaded, starting game...");
-  initGame();
-});
+// Start game after CSV is loaded
+loadData().then(initGame);
