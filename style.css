@@ -1,24 +1,40 @@
-// ui.js
-// Spanish front-end strings
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  padding: 30px;
+  background-color: #f9f9f9;
+}
 
-const UI_STRINGS = {
-  questionPopularName: "¿Cuál fue el nombre más popular en el año {year}?",
-  questionMostPopularYear: "¿En qué año fue más popular el nombre {name}?",
-  correct: "✅ Correcto!",
-  incorrect: "❌ Incorrecto. La respuesta correcta fue {answer} con {count} nacimientos.",
-  score: "Puntuación: {score} / {total}",
-  genderMale: "Masculino",
-  genderFemale: "Femenino"
-};
+#game {
+  display: inline-block;
+  padding: 20px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
 
-// Simple string formatter
-function formatString(template, values) {
-  return template.replace(/{(\w+)}/g, (_, key) => {
-    const value = values[key];
-    if (value === undefined || value === null) {
-      console.warn(`Missing value for key: ${key}`, values);
-      return '';
-    }
-    return String(value);
-  });
+button {
+  margin: 10px;
+  padding: 10px 20px;
+  font-size: 16px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  background-color: #f0f0f0;
+  min-width: 120px;
+  min-height: 40px;
+}
+
+button:hover {
+  background-color: #e0e0e0;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+#feedback {
+  font-weight: bold;
+  margin-top: 15px;
 }
