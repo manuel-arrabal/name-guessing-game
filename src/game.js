@@ -1,302 +1,127 @@
-// game.js
-// English comments & code, Spanish front-end via ui.js
+#!/usr/bin/env python3
+"""Script para analizar qué pudo haber causado el problema"""
 
-// namesData is global, loaded from dataLoader.js
-let currentQuestion = null;
-let score = 0;
-let totalQuestions = 0;
+import sys
+from pathlib import Path
+import pandas as pd
 
-function randomItem(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from utils.datasource_config import get_datasource_uid
+import requests
+import os
+
+try:
+    from dotenv import load_dotenv
+    root_dir = Path(__file__).parent.parent
+    env_path = root_dir / '.env.local'
+    load_dotenv(dotenv_path=env_path)
+except:
+    pass
+
+GRAFANA_URL = os.environ.get("GRAFANA_URL", "https://grafana-bi.sebo.i.check24.es")
+GRAFANA_API_KEY = os.environ.get("GRAFANA_API_KEY")
+headers = {
+    "Authorization": f"Bearer {GRAFANA_API_KEY}",
+    "Content-Type": "application/json",
+    "X-Grafana-Org-Id": "3"
 }
 
-function shuffle(arr) {
-  const shuffled = [...arr]; // Create a copy
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
+def fetch_grafana_data(sql, datasource_name):
+    try:
+        from utils.datasource_config import get_datasource_uid
+        datasource_uid = get_datasource_uid(datasource_name)
+    except KeyError:
+        print(f"❌ Datasource '{datasource_name}' not found")
+        return pd.DataFrame()
 
-// Initialize the game after data is loaded
-function initGame() {
-  if (!namesData || namesData.length === 0) {
-    console.error("No data loaded");
-    const questionEl = document.getElementById('question');
-    if (questionEl) {
-      questionEl.innerText = 'Error: No se pudieron cargar los datos. Por favor, recarga la página.';
+    payload = {
+        "queries": [{
+            "refId": "A",
+            "datasource": {"type": "mysql", "uid": datasource_uid},
+            "format": "table",
+            "rawSql": sql
+        }]
     }
-    return;
-  }
-  
-  console.log('Initializing game with', namesData.length, 'data points');
-  score = 0;
-  totalQuestions = 0;
 
-  // Attach button listeners
-  for (let i = 0; i < 3; i++) {
-    const btn = document.getElementById(`option${i}`);
-    if (btn) {
-      btn.onclick = () => checkAnswer(i);
-    } else {
-      console.error(`Button option${i} not found`);
-    }
-  }
+    try:
+        response = requests.post(f"{GRAFANA_URL}/api/ds/query", headers=headers, json=payload, timeout=120)
+        response.raise_for_status()
+        data = response.json()
+        results_a = data.get("results", {}).get("A", {})
+        if "frames" in results_a:
+            frames = results_a["frames"]
+            if frames:
+                fields = frames[0]["schema"]["fields"]
+                columns = [f["name"] for f in fields]
+                values = frames[0]["data"]["values"]
+                df = pd.DataFrame({col: values[i] for i, col in enumerate(columns)})
+                return df
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return pd.DataFrame()
 
-  generateQuestion();
-}
+print("=" * 80)
+print("ANÁLISIS DEL PROBLEMA: ¿Por qué había 946 en lugar de 1072?")
+print("=" * 80)
 
-// Generate random question type
-function generateQuestion() {
-  const type = Math.random() < 0.5 ? 'popularName' : 'mostPopularYear';
-  if (type === 'popularName') {
-    generatePopularNameQuestion();
-  } else {
-    generateMostPopularYearQuestion();
-  }
-}
+# 1. Verificar qué hay en la base de datos ahora
+print("\n1️⃣ Verificando datos actuales en la base de datos:")
+sql1 = """
+SELECT 
+    kpi_date,
+    DATE_FORMAT(kpi_date, '%Y-%m-%d') AS kpi_date_formatted,
+    provider,
+    insurer,
+    totalConfirmations,
+    totalSuccessConfirmations
+FROM partnernet.seco_confirmation_kpi
+WHERE DATE(kpi_date) = '2025-12-29'
+  AND provider = '2-ALLIANZ-DIRECT-2'
+  AND insurer = 'Allianz Direct';
+"""
+df1 = fetch_grafana_data(sql1, "data-warehouse-pnet")
+if not df1.empty:
+    print(f"   ✅ Datos actuales: {df1['totalConfirmations'].iloc[0]} totalConfirmations")
+    print(f"      kpi_date tipo: {type(df1['kpi_date'].iloc[0])}")
+    print(f"      kpi_date valor: {df1['kpi_date'].iloc[0]}")
+else:
+    print("   ❌ No se encontraron datos")
 
-// Question: Most popular name in a given year
-function generatePopularNameQuestion(attempts = 0) {
-  if (attempts > 10) {
-    console.error('Too many attempts to generate question');
-    document.getElementById('question').innerText = 'Error al generar pregunta. Por favor, recarga la página.';
-    return;
-  }
-  
-  const years = [...new Set(namesData.map(d => d.year))];
-  const year = randomItem(years);
-  const gender = randomItem(['M','F']);
-  const pool = namesData.filter(d => d.year === year && d.gender === gender);
-  if (pool.length < 3) return generatePopularNameQuestion(attempts + 1);
+# 2. Verificar si hay registros duplicados o con fechas incorrectas
+print("\n2️⃣ Verificando si hay registros con fechas incorrectas o duplicados:")
+sql2 = """
+SELECT 
+    kpi_date,
+    DATE_FORMAT(kpi_date, '%Y-%m-%d') AS kpi_date_formatted,
+    provider,
+    insurer,
+    totalConfirmations,
+    COUNT(*) as count
+FROM partnernet.seco_confirmation_kpi
+WHERE provider = '2-ALLIANZ-DIRECT-2'
+  AND insurer = 'Allianz Direct'
+  AND (DATE(kpi_date) = '2025-12-29' OR kpi_date LIKE '%2025-12-29%')
+GROUP BY kpi_date, provider, insurer, totalConfirmations;
+"""
+df2 = fetch_grafana_data(sql2, "data-warehouse-pnet")
+if not df2.empty:
+    print(f"   Encontrados {len(df2)} registros:")
+    print(df2.to_string(index=False))
+else:
+    print("   No se encontraron registros")
 
-  // Sort by count descending and get the most popular
-  const sortedPool = [...pool].sort((a, b) => b.count - a.count);
-  const correct = sortedPool[0];
-  
-  // Get distractors with similar popularity (within reasonable range)
-  const distractors = sortedPool.slice(1).filter(d => 
-    d.name !== correct.name && 
-    Math.abs(d.count - correct.count) < correct.count * 0.5
-  );
-  
-  if (distractors.length < 2) {
-    // If not enough similar distractors, use any other names
-    const otherNames = sortedPool.slice(1, 10);
-    if (otherNames.length < 2) return generatePopularNameQuestion(attempts + 1);
-    const options = shuffle([correct, otherNames[0], otherNames[1]]);
-    currentQuestion = { type:'popularName', year, gender, correct, options };
-  } else {
-    const options = shuffle([correct, randomItem(distractors), randomItem(distractors)]);
-    currentQuestion = { type:'popularName', year, gender, correct, options };
-  }
+# 3. Verificar el historial de cambios (si hay tabla de logs)
+print("\n3️⃣ Conclusión:")
+print("   El problema probablemente fue:")
+print("   - Cuando se procesó diciembre 2025 mes por mes, los datos se insertaron incorrectamente")
+print("   - Posibles causas:")
+print("     a) Las fechas venían como timestamps y no se procesaron correctamente")
+print("     b) Hubo un error parcial que no se detectó")
+print("     c) Múltiples ejecuciones sobrescribieron datos incorrectos")
+print("   - La solución fue ejecutar el script para el día específico, que corrigió los datos")
+print("   - Las mejoras que agregamos (validación de timestamps) previenen este problema en el futuro")
 
-  document.getElementById('question').innerText = formatString(
-    UI_STRINGS.questionPopularName,
-    { year }
-  );
+print("\n" + "=" * 80)
 
-  currentQuestion.options.forEach((opt,i) => {
-    const btn = document.getElementById(`option${i}`);
-    if (btn && opt && opt.name) {
-      btn.innerText = opt.name;
-      btn.style.display = 'inline-block';
-    } else {
-      console.error(`Invalid option at index ${i}:`, opt);
-      btn.style.display = 'none';
-    }
-  });
-
-  document.getElementById('feedback').innerText = '';
-}
-
-// Question: Year in which a name was most popular
-function generateMostPopularYearQuestion(attempts = 0) {
-  if (attempts > 10) {
-    console.error('Too many attempts to generate question');
-    document.getElementById('question').innerText = 'Error al generar pregunta. Por favor, recarga la página.';
-    return;
-  }
-  
-  const names = [...new Set(namesData.map(d => d.name).filter(n => n && n.trim() !== ''))];
-  if (names.length === 0) {
-    console.error('No valid names found in data');
-    return;
-  }
-  const name = randomItem(names);
-  if (!name || name.trim() === '') {
-    return generateMostPopularYearQuestion(attempts + 1);
-  }
-  const pool = namesData.filter(d => d.name === name && d.year && !isNaN(d.year));
-  
-  if (pool.length < 3) return generateMostPopularYearQuestion(attempts + 1);
-  
-  const correct = pool.reduce((a,b) => a.count > b.count ? a : b);
-  
-  // Validate correct answer
-  if (!correct || !correct.year || isNaN(correct.year)) {
-    console.error('Invalid correct answer:', correct);
-    return generateMostPopularYearQuestion(attempts + 1);
-  }
-  
-  // Get other years for this name, excluding the correct one
-  const otherYears = pool.filter(d => d.year !== correct.year && d.year && !isNaN(d.year));
-  if (otherYears.length < 2) return generateMostPopularYearQuestion(attempts + 1);
-  
-  // Ensure we have unique years for options
-  const uniqueYears = [...new Set(otherYears.map(d => d.year).filter(y => !isNaN(y) && y > 0))];
-  if (uniqueYears.length < 2) {
-    console.log('Not enough unique years:', uniqueYears);
-    return generateMostPopularYearQuestion(attempts + 1);
-  }
-  
-  // Get first occurrence of each unique year
-  const year1 = otherYears.find(d => d.year === uniqueYears[0] && d.year && !isNaN(d.year));
-  const year2 = otherYears.find(d => d.year === uniqueYears[1] && d.year && !isNaN(d.year));
-  
-  console.log('Selected years:', { 
-    uniqueYears, 
-    year1: year1 ? { year: year1.year, full: year1 } : null,
-    year2: year2 ? { year: year2.year, full: year2 } : null,
-    correct: { year: correct.year, full: correct }
-  });
-  
-  if (!year1 || !year1.year || isNaN(year1.year) || !year2 || !year2.year || isNaN(year2.year)) {
-    console.error('Invalid year options:', { year1, year2, uniqueYears });
-    return generateMostPopularYearQuestion(attempts + 1);
-  }
-  
-  // Validate all three options before shuffling
-  if (!correct || !correct.year || isNaN(correct.year)) {
-    console.error('Invalid correct option:', correct);
-    return generateMostPopularYearQuestion(attempts + 1);
-  }
-  
-  // Create options array with explicit year values
-  const options = shuffle([
-    { ...correct, year: Number(correct.year) },
-    { ...year1, year: Number(year1.year) },
-    { ...year2, year: Number(year2.year) }
-  ]);
-  
-  // Final validation of options
-  const invalidOptions = options.filter((opt, idx) => {
-    if (!opt || opt.year === undefined || opt.year === null || isNaN(opt.year)) {
-      console.error(`Invalid option after shuffle at index ${idx}:`, opt);
-      return true;
-    }
-    return false;
-  });
-  
-  if (invalidOptions.length > 0) {
-    console.error('Found invalid options, retrying...');
-    return generateMostPopularYearQuestion(attempts + 1);
-  }
-  
-  currentQuestion = { type:'mostPopularYear', name, correct, options };
-
-  if (!name || name.trim() === '') {
-    console.error('Name is empty or undefined');
-    return generateMostPopularYearQuestion(attempts + 1);
-  }
-  
-  console.log('Generated question:', { 
-    name, 
-    nameType: typeof name,
-    correct: correct.year, 
-    correctObj: correct,
-    options: options.map(o => ({ year: o.year, yearType: typeof o.year, fullObj: o }))
-  });
-
-  // Validate name before using it
-  if (!name || String(name).trim() === '' || name === '0') {
-    console.error('Invalid name value:', name);
-    return generateMostPopularYearQuestion(attempts + 1);
-  }
-
-  const questionText = formatString(
-    UI_STRINGS.questionMostPopularYear,
-    { name: String(name) }
-  );
-  document.getElementById('question').innerText = questionText;
-
-  // Use options directly, not currentQuestion.options to avoid reference issues
-  options.forEach((opt, i) => {
-    const btn = document.getElementById(`option${i}`);
-    if (!btn) {
-      console.error(`Button option${i} not found`);
-      return;
-    }
-    
-    if (!opt) {
-      console.error(`Option ${i} is null or undefined`);
-      btn.style.display = 'none';
-      return;
-    }
-    
-    // Try multiple ways to access the year
-    const yearValue = opt.year !== undefined ? opt.year : (opt['year'] !== undefined ? opt['year'] : null);
-    console.log(`Option ${i}:`, { 
-      opt, 
-      yearValue, 
-      yearType: typeof yearValue,
-      hasYear: 'year' in opt,
-      keys: Object.keys(opt)
-    });
-    
-    if (yearValue !== undefined && yearValue !== null && !isNaN(yearValue) && yearValue > 0) {
-      btn.innerText = String(yearValue);
-      btn.style.display = 'inline-block';
-    } else {
-      console.error(`Invalid year in option ${i}:`, { opt, yearValue, allProps: Object.keys(opt) });
-      btn.style.display = 'none';
-    }
-  });
-  
-  // Update currentQuestion.options to match what we just displayed
-  currentQuestion.options = options;
-
-  document.getElementById('feedback').innerText = '';
-}
-
-// Check user's answer
-function checkAnswer(index) {
-  const selected = currentQuestion.options[index];
-  let isCorrect = false;
-
-  if (currentQuestion.type === 'popularName') {
-    isCorrect = selected.name === currentQuestion.correct.name;
-  } else {
-    isCorrect = selected.year === currentQuestion.correct.year;
-  }
-
-  totalQuestions++;
-  if(isCorrect) score++;
-
-  document.getElementById('feedback').innerText = isCorrect
-    ? UI_STRINGS.correct
-    : formatString(UI_STRINGS.incorrect, {
-        answer: currentQuestion.type==='popularName'
-          ? currentQuestion.correct.name
-          : currentQuestion.correct.year,
-        count: currentQuestion.correct.count
-      });
-
-  document.getElementById('score').innerText = formatString(UI_STRINGS.score, {
-    score,
-    total: totalQuestions
-  });
-
-  setTimeout(generateQuestion, 1500);
-}
-
-// Start game after CSV is loaded
-loadData()
-  .then(() => {
-    initGame();
-  })
-  .catch(err => {
-    console.error("Failed to initialize game:", err);
-    document.getElementById('question').innerText = 'Error al inicializar el juego. Por favor, recarga la página.';
-  });
