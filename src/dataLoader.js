@@ -1,44 +1,33 @@
 // dataLoader.js
-// Load CSV data into memory safely
-// English comments, handles spaces, empty lines, and invalid numbers
+// Load CSV data into namesData array
+// English comments; Spanish front-end
 
 let namesData = [];
 
-/**
- * Load the CSV file from /data/names_2002_2023.csv
- * Parses each line and stores objects:
- * { year: number, gender: "M"|"F", name: string, count: number }
- */
-async function loadData() {
-  try {
-    const response = await fetch('data/names_2002_2023.csv');
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+function loadData() {
+  return fetch('data/names_2002_2023.csv')
+    .then(response => response.text())
+    .then(csvText => {
+      namesData = []; // reset
+      const lines = csvText.trim().split('\n');
+      const header = lines.shift().split(','); // Remove header
 
-    const csvText = await response.text();
-    const lines = csvText.split('\n');
+      lines.forEach(line => {
+        const cols = line.split(',');
+        if (cols.length < 4) return;
 
-    // Remove header
-    const dataLines = lines.slice(1);
+        const year = parseInt(cols[0].trim());
+        const gender = cols[1].trim();
+        const name = cols[2].trim();
+        const count = parseInt(cols[3].trim());
 
-    namesData = dataLines
-      .map(line => line.trim())               // remove leading/trailing spaces
-      .filter(line => line.length > 0)        // ignore empty lines
-      .map(line => {
-        // Change ',' to ';' if your CSV uses semicolon
-        const [year, gender, name, count] = line.split(',').map(item => item.trim());
-        return {
-          year: parseInt(year, 10),
-          gender,
-          name,
-          count: parseInt(count, 10)
-        };
-      })
-      .filter(d => !isNaN(d.year) && !isNaN(d.count)); // remove invalid entries
+        if (isNaN(year) || isNaN(count) || !name || !gender) return;
 
-    console.log(`Loaded ${namesData.length} records`);
-    console.log(namesData[0]); // debug first record
+        namesData.push({ year, gender, name, count });
+      });
 
-  } catch (error) {
-    console.error("Error loading CSV data:", error);
-  }
+      console.log(`Loaded ${namesData.length} records`);
+      return namesData;
+    })
+    .catch(err => console.error('Error loading CSV:', err));
 }
