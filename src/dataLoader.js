@@ -1,11 +1,11 @@
 // dataLoader.js
 // English comments & code, loads CSV into namesData
 
-let namesData = []; // This will store all the CSV rows
+let namesData = []; // Global array for game
 
 async function loadData() {
   try {
-    const response = await fetch('names_2002_2023.csv'); // Make sure the CSV file is in the same folder
+    const response = await fetch('names_2002_2023.csv'); // CSV in same folder
     const csvText = await response.text();
     parseCSV(csvText);
     console.log(`Loaded ${namesData.length} rows`);
