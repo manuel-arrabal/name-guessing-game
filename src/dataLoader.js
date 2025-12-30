@@ -1,5 +1,5 @@
 // dataLoader.js
-// Load CSV data into namesData array
+// Load CSV into namesData array
 // English comments; Spanish front-end
 
 let namesData = [];
@@ -8,9 +8,9 @@ function loadData() {
   return fetch('data/names_2002_2023.csv')
     .then(response => response.text())
     .then(csvText => {
-      namesData = []; // reset
+      namesData = [];
       const lines = csvText.trim().split('\n');
-      const header = lines.shift().split(','); // Remove header
+      lines.shift(); // remove header
 
       lines.forEach(line => {
         const cols = line.split(',');
@@ -26,7 +26,8 @@ function loadData() {
         namesData.push({ year, gender, name, count });
       });
 
-      console.log(`Loaded ${namesData.length} records`);
+      console.log('Loaded records:', namesData.length);
+      console.log('First record:', namesData[0]);
       return namesData;
     })
     .catch(err => console.error('Error loading CSV:', err));
