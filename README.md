@@ -73,9 +73,7 @@ The game can be hosted as a static site using:
 
 ## ✨ Inspiration
 
-- [namegrid.app](https://namegrid.app/)
-- *I wanted to analyze baby names, oops I built a whole game*  
-  https://medium.com/@three-things/i-wanted-to-analyze-baby-names-oops-i-built-a-whole-game-c60453ebfb9b
+- [*I wanted to analyze baby names, oops I built a whole game*](https://medium.com/@three-things/i-wanted-to-analyze-baby-names-oops-i-built-a-whole-game-c60453ebfb9b)
 
 ---
 
