@@ -1,7 +1,12 @@
+// game.js
+// English comments; Spanish front-end
+// Requires dataLoader.js loaded first
+
 let currentQuestion = null;
 let score = 0;
 let totalQuestions = 0;
 
+// Helper functions
 function shuffle(array) {
   return array.sort(() => Math.random() - 0.5);
 }
@@ -10,6 +15,7 @@ function randomItem(array) {
   return array[Math.floor(Math.random() * array.length)];
 }
 
+// Generate question
 function generateQuestion() {
   if (Math.random() < 0.5) {
     generatePopularNameQuestion();
@@ -18,6 +24,7 @@ function generateQuestion() {
   }
 }
 
+// Question: Most popular name in a year
 function generatePopularNameQuestion() {
   const years = [...new Set(namesData.map(d => d.year))];
   const year = randomItem(years);
@@ -44,6 +51,7 @@ function generatePopularNameQuestion() {
   });
 }
 
+// Question: Most popular year for a name
 function generateMostPopularYearQuestion() {
   const namesWithMultipleYears = Array.from(new Set(namesData.map(d=>d.name).filter(name => namesData.filter(e=>e.name===name).length>1)));
 
@@ -69,6 +77,7 @@ function generateMostPopularYearQuestion() {
   });
 }
 
+// Check answer
 function checkAnswer(index) {
   const selected = currentQuestion.options[index];
   let isCorrect = false;
@@ -88,9 +97,16 @@ function checkAnswer(index) {
   setTimeout(generateQuestion,1500);
 }
 
+// Init game
 function initGame() {
   for(let i=0;i<3;i++){
     document.getElementById(`option${i}`).addEventListener('click',()=>checkAnswer(i));
   }
   generateQuestion();
 }
+
+// Wait for data
+loadData().then(() => {
+  console.log('Datos cargados, iniciando juego...');
+  initGame();
+});
