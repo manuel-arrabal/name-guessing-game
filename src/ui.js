@@ -1,12 +1,17 @@
-// Spanish strings for front-end
-const TEXTS = {
-  questionMostPopularName: "¿Cuál fue el nombre más popular en el año",
-  questionMostPopularYear: "¿En qué año fue más popular el nombre",
-  correct: "¡Correcto!",
-  incorrect: "Incorrecto",
-  answerWas: "El número de nacimientos fue",
-  score: "Puntuación: ",
-  playAgain: "Jugar otra vez",
-  totalAnswered: "Preguntas contestadas correctamente: ",
-  next: "Siguiente"
+// ui.js
+// Spanish front-end strings
+
+const UI_STRINGS = {
+  questionPopularName: "¿Cuál fue el nombre más popular en el año {year}?",
+  questionMostPopularYear: "¿En qué año fue más popular el nombre {name}?",
+  correct: "✅ Correcto!",
+  incorrect: "❌ Incorrecto. La respuesta correcta fue {answer} con {count} nacimientos.",
+  score: "Puntuación: {score} / {total}",
+  genderMale: "Masculino",
+  genderFemale: "Femenino"
 };
+
+// Simple string formatter
+function formatString(template, values) {
+  return template.replace(/{(\w+)}/g, (_, key) => values[key] || '');
+}
