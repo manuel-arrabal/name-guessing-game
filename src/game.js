@@ -1,127 +1,261 @@
-#!/usr/bin/env python3
-"""Script para analizar qué pudo haber causado el problema"""
+// game.js
+// English comments & code, Spanish front-end via ui.js
 
-import sys
-from pathlib import Path
-import pandas as pd
+// namesData is global, loaded from dataLoader.js
+let currentQuestion = null;
+let score = 0;
+let totalQuestions = 0;
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from utils.datasource_config import get_datasource_uid
-import requests
-import os
-
-try:
-    from dotenv import load_dotenv
-    root_dir = Path(__file__).parent.parent
-    env_path = root_dir / '.env.local'
-    load_dotenv(dotenv_path=env_path)
-except:
-    pass
-
-GRAFANA_URL = os.environ.get("GRAFANA_URL", "https://grafana-bi.sebo.i.check24.es")
-GRAFANA_API_KEY = os.environ.get("GRAFANA_API_KEY")
-headers = {
-    "Authorization": f"Bearer {GRAFANA_API_KEY}",
-    "Content-Type": "application/json",
-    "X-Grafana-Org-Id": "3"
+function randomItem(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
-def fetch_grafana_data(sql, datasource_name):
-    try:
-        from utils.datasource_config import get_datasource_uid
-        datasource_uid = get_datasource_uid(datasource_name)
-    except KeyError:
-        print(f"❌ Datasource '{datasource_name}' not found")
-        return pd.DataFrame()
+function shuffle(arr) {
+  const shuffled = [...arr]; // Create a copy
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
 
-    payload = {
-        "queries": [{
-            "refId": "A",
-            "datasource": {"type": "mysql", "uid": datasource_uid},
-            "format": "table",
-            "rawSql": sql
-        }]
+// Initialize the game after data is loaded
+function initGame() {
+  if (!namesData || namesData.length === 0) {
+    console.error("No data loaded");
+    const questionEl = document.getElementById('question');
+    if (questionEl) {
+      questionEl.innerText = 'Error: No se pudieron cargar los datos. Por favor, recarga la página.';
+    }
+    return;
+  }
+  
+  console.log('Initializing game with', namesData.length, 'data points');
+  score = 0;
+  totalQuestions = 0;
+
+  // Attach button listeners
+  for (let i = 0; i < 3; i++) {
+    const btn = document.getElementById(`option${i}`);
+    if (btn) {
+      btn.onclick = () => checkAnswer(i);
+    } else {
+      console.error(`Button option${i} not found`);
+    }
+  }
+
+  generateQuestion();
+}
+
+// Generate random question type
+function generateQuestion() {
+  const type = Math.random() < 0.5 ? 'popularName' : 'mostPopularYear';
+  if (type === 'popularName') {
+    generatePopularNameQuestion();
+  } else {
+    generateMostPopularYearQuestion();
+  }
+}
+
+// Question: Most popular name in a given year
+function generatePopularNameQuestion(attempts = 0) {
+  if (attempts > 10) {
+    console.error('Too many attempts to generate question');
+    document.getElementById('question').innerText = 'Error al generar pregunta. Por favor, recarga la página.';
+    return;
+  }
+  
+  const years = [...new Set(namesData.map(d => d.year))];
+  const year = randomItem(years);
+  const gender = randomItem(['M','F']);
+  const pool = namesData.filter(d => d.year === year && d.gender === gender);
+  if (pool.length < 3) return generatePopularNameQuestion(attempts + 1);
+
+  // Sort by count descending and get the most popular
+  const sortedPool = [...pool].sort((a, b) => b.count - a.count);
+  const correct = sortedPool[0];
+  
+  // Get distractors with similar popularity (within reasonable range)
+  const distractors = sortedPool.slice(1).filter(d => 
+    d.name !== correct.name && 
+    Math.abs(d.count - correct.count) < correct.count * 0.5
+  );
+  
+  if (distractors.length < 2) {
+    // If not enough similar distractors, use any other names
+    const otherNames = sortedPool.slice(1, 10);
+    if (otherNames.length < 2) return generatePopularNameQuestion(attempts + 1);
+    const options = shuffle([correct, otherNames[0], otherNames[1]]);
+    currentQuestion = { type:'popularName', year, gender, correct, options };
+  } else {
+    const options = shuffle([correct, randomItem(distractors), randomItem(distractors)]);
+    currentQuestion = { type:'popularName', year, gender, correct, options };
+  }
+
+  document.getElementById('question').innerText = formatString(
+    UI_STRINGS.questionPopularName,
+    { year }
+  );
+
+  currentQuestion.options.forEach((opt,i) => {
+    const btn = document.getElementById(`option${i}`);
+    if (btn && opt && opt.name) {
+      btn.innerText = opt.name;
+      btn.style.display = 'inline-block';
+    } else {
+      console.error(`Invalid option at index ${i}:`, opt);
+      btn.style.display = 'none';
+    }
+  });
+
+  document.getElementById('feedback').innerText = '';
+}
+
+// Question: Year in which a name was most popular
+function generateMostPopularYearQuestion(attempts = 0) {
+  if (attempts > 20) {
+    console.error('Too many attempts to generate question');
+    document.getElementById('question').innerText = 'Error al generar pregunta. Por favor, recarga la página.';
+    return;
+  }
+  
+  try {
+    const names = [...new Set(namesData.map(d => d.name).filter(n => n && n.trim() !== ''))];
+    if (names.length === 0) {
+      console.error('No valid names found in data');
+      document.getElementById('question').innerText = 'No se encontraron nombres válidos en los datos.';
+      return;
+    }
+    
+    const name = randomItem(names);
+    if (!name || String(name).trim() === '') {
+      return generateMostPopularYearQuestion(attempts + 1);
+    }
+    
+    const pool = namesData.filter(d => d.name === name && d.year && !isNaN(parseInt(d.year)));
+    if (pool.length < 3) {
+      return generateMostPopularYearQuestion(attempts + 1);
+    }
+    
+    const correct = pool.reduce((a,b) => (a.count > b.count ? a : b));
+    if (!correct || !correct.year) {
+      return generateMostPopularYearQuestion(attempts + 1);
+    }
+    
+    // Get other years for this name, excluding the correct one
+    const otherYears = pool.filter(d => d.year !== correct.year);
+    if (otherYears.length < 2) {
+      return generateMostPopularYearQuestion(attempts + 1);
+    }
+    
+    // Get unique years
+    const uniqueYears = [...new Set(otherYears.map(d => parseInt(d.year)).filter(y => !isNaN(y) && y > 0))];
+    if (uniqueYears.length < 2) {
+      return generateMostPopularYearQuestion(attempts + 1);
+    }
+    
+    // Get entries for the two unique years
+    const year1Entry = otherYears.find(d => parseInt(d.year) === uniqueYears[0]);
+    const year2Entry = otherYears.find(d => parseInt(d.year) === uniqueYears[1]);
+    
+    if (!year1Entry || !year2Entry) {
+      return generateMostPopularYearQuestion(attempts + 1);
+    }
+    
+    // Get year values
+    const year1 = parseInt(correct.year);
+    const year2 = parseInt(year1Entry.year);
+    const year3 = parseInt(year2Entry.year);
+    
+    // Validate all years before proceeding
+    if (isNaN(year1) || isNaN(year2) || isNaN(year3) || year1 <= 0 || year2 <= 0 || year3 <= 0) {
+      console.error('Invalid years detected:', { year1, year2, year3, correct, year1Entry, year2Entry });
+      return generateMostPopularYearQuestion(attempts + 1);
+    }
+    
+    // Create simple option objects with just the year
+    const option1 = { year: year1, name: correct.name, count: correct.count, gender: correct.gender };
+    const option2 = { year: year2, name: year1Entry.name, count: year1Entry.count, gender: year1Entry.gender };
+    const option3 = { year: year3, name: year2Entry.name, count: year2Entry.count, gender: year2Entry.gender };
+    
+    const options = shuffle([option1, option2, option3]);
+    currentQuestion = { type:'mostPopularYear', name: String(name), correct: option1, options };
+
+    // Display question
+    const questionText = formatString(UI_STRINGS.questionMostPopularYear, { name: String(name) });
+    const questionEl = document.getElementById('question');
+    if (questionEl) {
+      questionEl.innerText = questionText;
     }
 
-    try:
-        response = requests.post(f"{GRAFANA_URL}/api/ds/query", headers=headers, json=payload, timeout=120)
-        response.raise_for_status()
-        data = response.json()
-        results_a = data.get("results", {}).get("A", {})
-        if "frames" in results_a:
-            frames = results_a["frames"]
-            if frames:
-                fields = frames[0]["schema"]["fields"]
-                columns = [f["name"] for f in fields]
-                values = frames[0]["data"]["values"]
-                df = pd.DataFrame({col: values[i] for i, col in enumerate(columns)})
-                return df
-        return pd.DataFrame()
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        return pd.DataFrame()
+    // Display options - use currentQuestion.options to match other question type
+    currentQuestion.options.forEach((opt, i) => {
+      const btn = document.getElementById(`option${i}`);
+      if (!btn) {
+        console.error(`Button option${i} not found in DOM`);
+        return;
+      }
+      
+      if (!opt || opt.year === undefined || opt.year === null) {
+        console.error(`Invalid option ${i}:`, opt);
+        btn.style.display = 'none';
+        return;
+      }
+      
+      const yearValue = parseInt(opt.year);
+      if (!isNaN(yearValue) && yearValue > 0) {
+        btn.innerText = String(yearValue);
+        btn.style.display = 'inline-block';
+      } else {
+        console.error(`Invalid year value for option ${i}:`, { opt, yearValue });
+        btn.style.display = 'none';
+      }
+    });
 
-print("=" * 80)
-print("ANÁLISIS DEL PROBLEMA: ¿Por qué había 946 en lugar de 1072?")
-print("=" * 80)
+    document.getElementById('feedback').innerText = '';
+  } catch (error) {
+    console.error('Error generating question:', error);
+    document.getElementById('question').innerText = 'Error al generar pregunta. Por favor, recarga la página.';
+  }
+}
 
-# 1. Verificar qué hay en la base de datos ahora
-print("\n1️⃣ Verificando datos actuales en la base de datos:")
-sql1 = """
-SELECT 
-    kpi_date,
-    DATE_FORMAT(kpi_date, '%Y-%m-%d') AS kpi_date_formatted,
-    provider,
-    insurer,
-    totalConfirmations,
-    totalSuccessConfirmations
-FROM partnernet.seco_confirmation_kpi
-WHERE DATE(kpi_date) = '2025-12-29'
-  AND provider = '2-ALLIANZ-DIRECT-2'
-  AND insurer = 'Allianz Direct';
-"""
-df1 = fetch_grafana_data(sql1, "data-warehouse-pnet")
-if not df1.empty:
-    print(f"   ✅ Datos actuales: {df1['totalConfirmations'].iloc[0]} totalConfirmations")
-    print(f"      kpi_date tipo: {type(df1['kpi_date'].iloc[0])}")
-    print(f"      kpi_date valor: {df1['kpi_date'].iloc[0]}")
-else:
-    print("   ❌ No se encontraron datos")
+// Check user's answer
+function checkAnswer(index) {
+  const selected = currentQuestion.options[index];
+  let isCorrect = false;
 
-# 2. Verificar si hay registros duplicados o con fechas incorrectas
-print("\n2️⃣ Verificando si hay registros con fechas incorrectas o duplicados:")
-sql2 = """
-SELECT 
-    kpi_date,
-    DATE_FORMAT(kpi_date, '%Y-%m-%d') AS kpi_date_formatted,
-    provider,
-    insurer,
-    totalConfirmations,
-    COUNT(*) as count
-FROM partnernet.seco_confirmation_kpi
-WHERE provider = '2-ALLIANZ-DIRECT-2'
-  AND insurer = 'Allianz Direct'
-  AND (DATE(kpi_date) = '2025-12-29' OR kpi_date LIKE '%2025-12-29%')
-GROUP BY kpi_date, provider, insurer, totalConfirmations;
-"""
-df2 = fetch_grafana_data(sql2, "data-warehouse-pnet")
-if not df2.empty:
-    print(f"   Encontrados {len(df2)} registros:")
-    print(df2.to_string(index=False))
-else:
-    print("   No se encontraron registros")
+  if (currentQuestion.type === 'popularName') {
+    isCorrect = selected.name === currentQuestion.correct.name;
+  } else {
+    isCorrect = selected.year === currentQuestion.correct.year;
+  }
 
-# 3. Verificar el historial de cambios (si hay tabla de logs)
-print("\n3️⃣ Conclusión:")
-print("   El problema probablemente fue:")
-print("   - Cuando se procesó diciembre 2025 mes por mes, los datos se insertaron incorrectamente")
-print("   - Posibles causas:")
-print("     a) Las fechas venían como timestamps y no se procesaron correctamente")
-print("     b) Hubo un error parcial que no se detectó")
-print("     c) Múltiples ejecuciones sobrescribieron datos incorrectos")
-print("   - La solución fue ejecutar el script para el día específico, que corrigió los datos")
-print("   - Las mejoras que agregamos (validación de timestamps) previenen este problema en el futuro")
+  totalQuestions++;
+  if(isCorrect) score++;
 
-print("\n" + "=" * 80)
+  document.getElementById('feedback').innerText = isCorrect
+    ? UI_STRINGS.correct
+    : formatString(UI_STRINGS.incorrect, {
+        answer: currentQuestion.type==='popularName'
+          ? currentQuestion.correct.name
+          : currentQuestion.correct.year,
+        count: currentQuestion.correct.count
+      });
 
+  document.getElementById('score').innerText = formatString(UI_STRINGS.score, {
+    score,
+    total: totalQuestions
+  });
+
+  setTimeout(generateQuestion, 1500);
+}
+
+// Start game after CSV is loaded
+loadData()
+  .then(() => {
+    initGame();
+  })
+  .catch(err => {
+    console.error("Failed to initialize game:", err);
+    document.getElementById('question').innerText = 'Error al inicializar el juego. Por favor, recarga la página.';
+  });
