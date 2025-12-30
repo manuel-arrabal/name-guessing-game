@@ -1,25 +1,30 @@
 // dataLoader.js
-// English comments & code, loads CSV into namesData
+// Loads CSV into namesData array
 
-let namesData = []; // Global array for game
+let namesData = [];
 
 async function loadData() {
   try {
-    // Use relative path that works both locally and on GitHub Pages
-    const csvPath = 'data/names_2001_2023.csv';
+    // Correct filename: names_2002_2023.csv
+    const csvPath = 'data/names_2002_2023.csv';
     console.log('Loading CSV from:', csvPath);
+    
     const response = await fetch(csvPath);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}, URL: ${csvPath}`);
     }
+    
     const csvText = await response.text();
     if (!csvText || csvText.trim().length === 0) {
       throw new Error('CSV file is empty');
     }
+    
     parseCSV(csvText);
+    
     if (namesData.length === 0) {
       throw new Error('No data parsed from CSV');
     }
+    
     console.log(`Loaded ${namesData.length} rows`);
     return namesData;
   } catch (err) {
@@ -32,14 +37,13 @@ async function loadData() {
   }
 }
 
-// Simple CSV parser
 function parseCSV(text) {
   const lines = text.trim().split('\n');
-  const headers = lines[0].split(',');
-  namesData = lines.slice(1)
-    .filter(line => line.trim().length > 0) // Skip empty lines
+  
+  namesData = lines.slice(1) // Skip header
+    .filter(line => line.trim().length > 0)
     .map((line, lineNum) => {
-      // Remove any BOM or special characters
+      // Remove BOM if present
       line = line.replace(/^\uFEFF/, '');
       
       const parts = line.split(',');
@@ -58,11 +62,11 @@ function parseCSV(text) {
       
       // Validate all fields
       if (isNaN(year) || isNaN(count) || !gender || !name || name.length === 0) {
-        console.warn(`Invalid data in line ${lineNum + 2}:`, { yearStr, gender, name, countStr, year, count });
+        console.warn(`Invalid data in line ${lineNum + 2}:`, { yearStr, gender, name, countStr });
         return null;
       }
       
-      // Ensure name is a string, not a number
+      // Ensure name is valid
       const nameStr = String(name);
       if (nameStr === '0' || nameStr === '') {
         console.warn(`Invalid name in line ${lineNum + 2}:`, name);
@@ -76,19 +80,20 @@ function parseCSV(text) {
         count: count
       };
     })
-    .filter(item => item !== null && 
-                   !isNaN(item.year) && 
-                   !isNaN(item.count) && 
-                   item.name && 
-                   item.name.trim().length > 0 &&
-                   item.name !== '0' &&
-                   item.gender &&
-                   item.year > 0 &&
-                   item.count > 0);
+    .filter(item => 
+      item !== null && 
+      !isNaN(item.year) && 
+      !isNaN(item.count) && 
+      item.name && 
+      item.name.trim().length > 0 &&
+      item.name !== '0' &&
+      item.gender &&
+      item.year > 0 &&
+      item.count > 0
+    );
   
   console.log(`Parsed ${namesData.length} valid rows from CSV`);
   if (namesData.length > 0) {
     console.log('Sample data:', namesData[0]);
-    console.log('Sample name type:', typeof namesData[0].name);
   }
 }
