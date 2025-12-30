@@ -64,7 +64,7 @@ The game can be hosted as a static site using:
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/your-repo-name.git
+   git clone https://github.com/manuel-arrabal/name-guessing-game
    ```
 2. Open `index.html` in your browser  
 *(or use a local development server if preferred)*
