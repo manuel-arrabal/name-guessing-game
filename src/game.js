@@ -18,14 +18,25 @@ function shuffle(arr) {
 function initGame() {
   if (!namesData || namesData.length === 0) {
     console.error("No data loaded");
+    const questionEl = document.getElementById('question');
+    if (questionEl) {
+      questionEl.innerText = 'Error: No se pudieron cargar los datos. Por favor, recarga la página.';
+    }
     return;
   }
+  
+  console.log('Initializing game with', namesData.length, 'data points');
   score = 0;
   totalQuestions = 0;
 
   // Attach button listeners
   for (let i = 0; i < 3; i++) {
-    document.getElementById(`option${i}`).onclick = () => checkAnswer(i);
+    const btn = document.getElementById(`option${i}`);
+    if (btn) {
+      btn.onclick = () => checkAnswer(i);
+    } else {
+      console.error(`Button option${i} not found`);
+    }
   }
 
   generateQuestion();
@@ -42,12 +53,18 @@ function generateQuestion() {
 }
 
 // Question: Most popular name in a given year
-function generatePopularNameQuestion() {
+function generatePopularNameQuestion(attempts = 0) {
+  if (attempts > 10) {
+    console.error('Too many attempts to generate question');
+    document.getElementById('question').innerText = 'Error al generar pregunta. Por favor, recarga la página.';
+    return;
+  }
+  
   const years = [...new Set(namesData.map(d => d.year))];
   const year = randomItem(years);
   const gender = randomItem(['M','F']);
   const pool = namesData.filter(d => d.year === year && d.gender === gender);
-  if (pool.length < 3) return generateQuestion();
+  if (pool.length < 3) return generatePopularNameQuestion(attempts + 1);
 
   // Sort by count descending and get the most popular
   const sortedPool = [...pool].sort((a, b) => b.count - a.count);
@@ -62,7 +79,7 @@ function generatePopularNameQuestion() {
   if (distractors.length < 2) {
     // If not enough similar distractors, use any other names
     const otherNames = sortedPool.slice(1, 10);
-    if (otherNames.length < 2) return generateQuestion();
+    if (otherNames.length < 2) return generatePopularNameQuestion(attempts + 1);
     const options = shuffle([correct, otherNames[0], otherNames[1]]);
     currentQuestion = { type:'popularName', year, gender, correct, options };
   } else {
@@ -76,25 +93,33 @@ function generatePopularNameQuestion() {
   );
 
   currentQuestion.options.forEach((opt,i) => {
-    document.getElementById(`option${i}`).innerText = opt.name;
+    const btn = document.getElementById(`option${i}`);
+    btn.innerText = opt.name;
+    btn.style.display = 'inline-block';
   });
 
   document.getElementById('feedback').innerText = '';
 }
 
 // Question: Year in which a name was most popular
-function generateMostPopularYearQuestion() {
+function generateMostPopularYearQuestion(attempts = 0) {
+  if (attempts > 10) {
+    console.error('Too many attempts to generate question');
+    document.getElementById('question').innerText = 'Error al generar pregunta. Por favor, recarga la página.';
+    return;
+  }
+  
   const names = [...new Set(namesData.map(d => d.name))];
   const name = randomItem(names);
   const pool = namesData.filter(d => d.name === name);
   
-  if (pool.length < 3) return generateQuestion();
+  if (pool.length < 3) return generateMostPopularYearQuestion(attempts + 1);
   
   const correct = pool.reduce((a,b) => a.count > b.count ? a : b);
   
   // Get other years for this name, excluding the correct one
   const otherYears = pool.filter(d => d.year !== correct.year);
-  if (otherYears.length < 2) return generateQuestion();
+  if (otherYears.length < 2) return generateMostPopularYearQuestion(attempts + 1);
   
   const options = shuffle([correct, randomItem(otherYears), randomItem(otherYears)]);
   currentQuestion = { type:'mostPopularYear', name, correct, options };
@@ -105,7 +130,9 @@ function generateMostPopularYearQuestion() {
   );
 
   currentQuestion.options.forEach((opt,i) => {
-    document.getElementById(`option${i}`).innerText = opt.year;
+    const btn = document.getElementById(`option${i}`);
+    btn.innerText = opt.year;
+    btn.style.display = 'inline-block';
   });
 
   document.getElementById('feedback').innerText = '';
