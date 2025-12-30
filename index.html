@@ -3,25 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TopNombres </title>
+  <title>TopNombres</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
   <div id="game">
     <h1 id="title">TopNombres</h1>
+    <span class="beta-badge">BETA</span>
     <h2 id="question">Cargando datos...</h2>
-
     <div id="options">
       <button id="option0" style="display: none;"></button>
       <button id="option1" style="display: none;"></button>
       <button id="option2" style="display: none;"></button>
     </div>
-
     <p id="feedback"></p>
     <p id="score">Puntuación: 0 / 0</p>
   </div>
 
-   <footer>
+  <footer>
     <p class="footer-text">
       <strong>Versión Beta</strong> · 
       No se recopilan ni utilizan datos personales
@@ -39,7 +38,6 @@
       </a>
     </p>
   </footer>
-
 
   <!-- Scripts -->
   <script src="src/dataLoader.js"></script>
