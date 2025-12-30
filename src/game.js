@@ -18,6 +18,7 @@ function randomItem(array) {
 
 // Generate next question
 function generateQuestion() {
+  // Randomly choose question type
   const questionType = Math.random() < 0.5 ? 'popularName' : 'nameYear';
 
   if (questionType === 'popularName') {
@@ -29,18 +30,25 @@ function generateQuestion() {
 
 // Question type 1: Which name was most popular in a given year?
 function generatePopularNameQuestion() {
-  const year = randomItem([...new Set(namesData.map(d => d.year))]);
+  const years = [...new Set(namesData.map(d => d.year))];
+  const year = randomItem(years);
   const gender = randomItem(['M', 'F']);
   const pool = namesData.filter(d => d.year === year && d.gender === gender);
 
+  if (pool.length < 3) return generateQuestion(); // Retry if not enough data
+
   const correct = randomItem(pool);
 
-  // distractors: close count, same year & gender
+  // distractors: similar count, same year & gender
   const distractors = pool.filter(
     d => d.name !== correct.name && Math.abs(d.count - correct.count) < 2000
   );
 
-  const options = shuffle([correct, randomItem(distractors), randomItem(distractors)]);
+  const options = shuffle([
+    correct,
+    randomItem(distractors),
+    randomItem(distractors)
+  ]);
 
   currentQuestion = { type: 'popularName', year, gender, correct, options };
 
@@ -55,14 +63,16 @@ function generatePopularNameQuestion() {
 
 // Question type 2: In which year was this name most popular?
 function generateMostPopularYearQuestion() {
+  // Filter names with at least 2 records
+  const namesWithMultipleYears = Array.from(
+    new Set(namesData.map(d => d.name).filter(name => namesData.filter(e => e.name === name).length > 1))
+  );
+
   let name = null;
   let pool = [];
 
-  const availableNames = namesData.map(d => d.name);
-
-  // ensure the name has multiple years of data
   do {
-    name = randomItem(availableNames);
+    name = randomItem(namesWithMultipleYears);
     pool = namesData.filter(d => d.name === name);
   } while (pool.length < 2);
 
@@ -70,6 +80,8 @@ function generateMostPopularYearQuestion() {
 
   // distractors: other years
   const distractors = pool.filter(d => d.year !== correct.year);
+  if (distractors.length < 2) return generateQuestion(); // retry if not enough distractors
+
   const options = shuffle([correct, randomItem(distractors), randomItem(distractors)]);
 
   currentQuestion = { type: 'nameYear', name, correct, options };
