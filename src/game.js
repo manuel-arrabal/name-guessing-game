@@ -49,17 +49,33 @@ function generatePopularNameQuestion() {
   const pool = namesData.filter(d => d.year === year && d.gender === gender);
   if (pool.length < 3) return generateQuestion();
 
-  const correct = randomItem(pool);
-  const distractors = pool.filter(d => d.name !== correct.name && Math.abs(d.count - correct.count) < 2000);
-  const options = shuffle([correct, randomItem(distractors), randomItem(distractors)]);
-  currentQuestion = { type:'popularName', year, gender, correct, options };
+  // Sort by count descending and get the most popular
+  const sortedPool = [...pool].sort((a, b) => b.count - a.count);
+  const correct = sortedPool[0];
+  
+  // Get distractors with similar popularity (within reasonable range)
+  const distractors = sortedPool.slice(1).filter(d => 
+    d.name !== correct.name && 
+    Math.abs(d.count - correct.count) < correct.count * 0.5
+  );
+  
+  if (distractors.length < 2) {
+    // If not enough similar distractors, use any other names
+    const otherNames = sortedPool.slice(1, 10);
+    if (otherNames.length < 2) return generateQuestion();
+    const options = shuffle([correct, otherNames[0], otherNames[1]]);
+    currentQuestion = { type:'popularName', year, gender, correct, options };
+  } else {
+    const options = shuffle([correct, randomItem(distractors), randomItem(distractors)]);
+    currentQuestion = { type:'popularName', year, gender, correct, options };
+  }
 
   document.getElementById('question').innerText = formatString(
     UI_STRINGS.questionPopularName,
     { year }
   );
 
-  options.forEach((opt,i) => {
+  currentQuestion.options.forEach((opt,i) => {
     document.getElementById(`option${i}`).innerText = opt.name;
   });
 
@@ -71,8 +87,16 @@ function generateMostPopularYearQuestion() {
   const names = [...new Set(namesData.map(d => d.name))];
   const name = randomItem(names);
   const pool = namesData.filter(d => d.name === name);
+  
+  if (pool.length < 3) return generateQuestion();
+  
   const correct = pool.reduce((a,b) => a.count > b.count ? a : b);
-  const options = shuffle([correct, randomItem(pool), randomItem(pool)]);
+  
+  // Get other years for this name, excluding the correct one
+  const otherYears = pool.filter(d => d.year !== correct.year);
+  if (otherYears.length < 2) return generateQuestion();
+  
+  const options = shuffle([correct, randomItem(otherYears), randomItem(otherYears)]);
   currentQuestion = { type:'mostPopularYear', name, correct, options };
 
   document.getElementById('question').innerText = formatString(
@@ -80,7 +104,7 @@ function generateMostPopularYearQuestion() {
     { name }
   );
 
-  options.forEach((opt,i) => {
+  currentQuestion.options.forEach((opt,i) => {
     document.getElementById(`option${i}`).innerText = opt.year;
   });
 
@@ -119,4 +143,11 @@ function checkAnswer(index) {
 }
 
 // Start game after CSV is loaded
-loadData().then(initGame);
+loadData()
+  .then(() => {
+    initGame();
+  })
+  .catch(err => {
+    console.error("Failed to initialize game:", err);
+    document.getElementById('question').innerText = 'Error al inicializar el juego. Por favor, recarga la página.';
+  });
