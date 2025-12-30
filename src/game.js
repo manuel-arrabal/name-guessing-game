@@ -1,112 +1,124 @@
 // game.js
-// English comments; Spanish front-end
-// Requires dataLoader.js loaded first
+// English comments & code, Spanish front-end via ui.js
 
-let currentQuestion = null;
-let score = 0;
-let totalQuestions = 0;
+let namesData = [];           // Array to store CSV data
+let currentQuestion = null;   // Current question object
+let score = 0;                // Correct answers count
+let totalQuestions = 0;       // Total questions asked
 
-// Helper functions
-function shuffle(array) {
-  return array.sort(() => Math.random() - 0.5);
+// Utility functions
+function randomItem(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function randomItem(array) {
-  return array[Math.floor(Math.random() * array.length)];
+function shuffle(arr) {
+  return arr.sort(() => Math.random() - 0.5);
 }
 
-// Generate question
+// Load data (CSV already loaded in dataLoader.js)
+function initGame() {
+  if (!namesData || namesData.length === 0) {
+    console.error("No data loaded");
+    return;
+  }
+  score = 0;
+  totalQuestions = 0;
+  generateQuestion();
+  // Attach button listeners
+  for (let i = 0; i < 3; i++) {
+    document.getElementById(`option${i}`).onclick = () => checkAnswer(i);
+  }
+}
+
+// Generate random question type
 function generateQuestion() {
-  if (Math.random() < 0.5) {
+  const type = Math.random() < 0.5 ? 'popularName' : 'mostPopularYear';
+  if (type === 'popularName') {
     generatePopularNameQuestion();
   } else {
     generateMostPopularYearQuestion();
   }
 }
 
-// Question: Most popular name in a year
+// Question: Which name was most popular in a given year?
 function generatePopularNameQuestion() {
   const years = [...new Set(namesData.map(d => d.year))];
   const year = randomItem(years);
   const gender = randomItem(['M','F']);
   const pool = namesData.filter(d => d.year === year && d.gender === gender);
-
   if (pool.length < 3) return generateQuestion();
 
   const correct = randomItem(pool);
   const distractors = pool.filter(d => d.name !== correct.name && Math.abs(d.count - correct.count) < 2000);
-
-  const options = shuffle([
-    correct,
-    randomItem(distractors),
-    randomItem(distractors)
-  ]);
-
+  const options = shuffle([correct, randomItem(distractors), randomItem(distractors)]);
   currentQuestion = { type:'popularName', year, gender, correct, options };
 
-  document.getElementById('question').innerText = `¿Cuál fue el nombre más popular en ${year}? (${gender==='M'?'Hombre':'Mujer'})`;
+  document.getElementById('question').innerText = formatString(
+    UI_STRINGS.questionPopularName,
+    { year, gender: gender==='M'?UI_STRINGS.genderMale:UI_STRINGS.genderFemale }
+  );
 
   options.forEach((opt,i) => {
     document.getElementById(`option${i}`).innerText = opt.name;
   });
+
+  document.getElementById('feedback').innerText = '';
 }
 
-// Question: Most popular year for a name
+// Question: Which year was a name most popular?
 function generateMostPopularYearQuestion() {
-  const namesWithMultipleYears = Array.from(new Set(namesData.map(d=>d.name).filter(name => namesData.filter(e=>e.name===name).length>1)));
+  const names = [...new Set(namesData.map(d => d.name))];
+  const name = randomItem(names);
+  const pool = namesData.filter(d => d.name === name);
+  const correct = pool.reduce((a,b) => a.count > b.count ? a : b);
+  const options = shuffle([correct, randomItem(pool), randomItem(pool)]);
+  currentQuestion = { type:'mostPopularYear', name, correct, options };
 
-  let name = null;
-  let pool = [];
+  document.getElementById('question').innerText = formatString(
+    UI_STRINGS.questionMostPopularYear,
+    { name }
+  );
 
-  do {
-    name = randomItem(namesWithMultipleYears);
-    pool = namesData.filter(d=>d.name===name);
-  } while(pool.length<2);
-
-  const correct = pool.reduce((a,b)=> a.count>b.count?a:b);
-  const distractors = pool.filter(d=>d.year!==correct.year);
-
-  const options = shuffle([correct, randomItem(distractors), randomItem(distractors)]);
-
-  currentQuestion = { type:'nameYear', name, correct, options };
-
-  document.getElementById('question').innerText = `¿En qué año fue más popular el nombre ${name}?`;
-
-  options.forEach((opt,i)=> {
+  options.forEach((opt,i) => {
     document.getElementById(`option${i}`).innerText = opt.year;
   });
+
+  document.getElementById('feedback').innerText = '';
 }
 
-// Check answer
+// Check user's answer
 function checkAnswer(index) {
   const selected = currentQuestion.options[index];
   let isCorrect = false;
 
-  if(currentQuestion.type==='popularName') isCorrect = selected.name===currentQuestion.correct.name;
-  if(currentQuestion.type==='nameYear') isCorrect = selected.year===currentQuestion.correct.year;
+  if (currentQuestion.type === 'popularName') {
+    isCorrect = selected.name === currentQuestion.correct.name;
+  } else {
+    isCorrect = selected.year === currentQuestion.correct.year;
+  }
 
   totalQuestions++;
   if(isCorrect) score++;
 
   document.getElementById('feedback').innerText = isCorrect
-    ? '✅ Correcto!'
-    : `❌ Incorrecto. La respuesta correcta era ${currentQuestion.type==='popularName'?currentQuestion.correct.name:currentQuestion.correct.year} (${currentQuestion.correct.count} nacimientos)`;
+    ? UI_STRINGS.correct
+    : formatString(UI_STRINGS.incorrect, {
+        answer: currentQuestion.type==='popularName'
+          ? currentQuestion.correct.name
+          : currentQuestion.correct.year,
+        count: currentQuestion.correct.count
+      });
 
-  document.getElementById('score').innerText = `Puntuación: ${score} / ${totalQuestions}`;
+  document.getElementById('score').innerText = formatString(UI_STRINGS.score, {
+    score,
+    total: totalQuestions
+  });
 
-  setTimeout(generateQuestion,1500);
+  setTimeout(generateQuestion, 1500);
 }
 
-// Init game
-function initGame() {
-  for(let i=0;i<3;i++){
-    document.getElementById(`option${i}`).addEventListener('click',()=>checkAnswer(i));
-  }
-  generateQuestion();
-}
-
-// Wait for data
+// Initialize after data is loaded
 loadData().then(() => {
-  console.log('Datos cargados, iniciando juego...');
+  console.log("Data loaded, starting game...");
   initGame();
 });
