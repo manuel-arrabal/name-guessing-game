@@ -3,38 +3,77 @@ body {
   text-align: center;
   padding: 30px;
   background-color: #f9f9f9;
+  margin: 0;
 }
 
 #game {
   display: inline-block;
-  padding: 20px;
+  padding: 30px;
   background-color: white;
   border-radius: 10px;
   box-shadow: 0 0 10px rgba(0,0,0,0.2);
+  max-width: 600px;
+}
+
+h1 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+#question {
+  font-size: 20px;
+  margin: 30px 0;
+  color: #555;
+  min-height: 60px;
+}
+
+#options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
 }
 
 button {
-  margin: 10px;
-  padding: 10px 20px;
-  font-size: 16px;
+  padding: 15px 20px;
+  font-size: 18px;
   border-radius: 5px;
-  border: 1px solid #ccc;
+  border: 2px solid #4CAF50;
   cursor: pointer;
   background-color: #f0f0f0;
-  min-width: 120px;
-  min-height: 40px;
+  transition: all 0.3s;
+  min-width: 200px;
 }
 
-button:hover {
-  background-color: #e0e0e0;
+button:hover:not(:disabled) {
+  background-color: #4CAF50;
+  color: white;
+  transform: scale(1.05);
 }
 
 button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+  border-color: #ccc;
 }
 
 #feedback {
   font-weight: bold;
-  margin-top: 15px;
+  margin-top: 20px;
+  font-size: 18px;
+  min-height: 30px;
+}
+
+#score {
+  margin-top: 20px;
+  font-size: 16px;
+  color: #666;
+}
+
+.correct {
+  color: #4CAF50;
+}
+
+.incorrect {
+  color: #f44336;
 }
