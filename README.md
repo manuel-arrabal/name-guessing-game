@@ -43,3 +43,47 @@ year,gender,name,count
 2021,F,LUCIA,3076
 2022,M,MATEO,2980
 ...
+```
+
+This format makes the data easy to inspect, extend, and reuse.
+
+# 🛠 Tech stack
+
+- HTML / CSS / JavaScript
+- No backend required
+- Runs entirely in the browser
+
+The game can be hosted as a static site using:
+- GitHub Pages
+- Netlify
+- Any static hosting service
+
+---
+
+## 🚀 Running locally
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/your-repo-name.git
+   ```
+2. Open `index.html` in your browser  
+*(or use a local development server if preferred)*
+
+---
+
+## ✨ Inspiration
+
+- [namegrid.app](https://namegrid.app/)
+- *I wanted to analyze baby names, oops I built a whole game*  
+  https://medium.com/@three-things/i-wanted-to-analyze-baby-names-oops-i-built-a-whole-game-c60453ebfb9b
+
+---
+
+## 📄 License
+
+This project is licensed under the **GNU General Public License v3.0**.
+
+You are free to use, modify, and distribute this software under the terms of the GPL-3.0 license.  
+Any derivative work must also be distributed under the same license.
+
+See the `LICENSE` file for more details.
