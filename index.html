@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Juego de nombres españoles</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Juego de Nombres en España</h1>
+    
+    <div id="game">
+      <p id="question"></p>
+      <div class="options">
+        <button class="option" id="option0"></button>
+        <button class="option" id="option1"></button>
+        <button class="option" id="option2"></button>
+      </div>
+      <p id="feedback"></p>
+      <p id="score"></p>
+      <button id="nextButton">Siguiente</button>
+    </div>
+  </div>
+
+  <script src="src/dataLoader.js"></script>
+  <script src="src/game.js"></script>
+  <script src="src/ui.js"></script>
+</body>
+</html>
