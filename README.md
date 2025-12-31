@@ -25,8 +25,7 @@ The difficulty is balanced by choosing names with **similar popularity**, so gue
 
 All data comes from **publicly available, aggregated statistics** published by the:
 
-**Instituto Nacional de Estadística (INE)**  
-https://www.ine.es
+**Instituto Nacional de Estadística (INE)** - https://www.ine.es
 
 - The dataset contains **no personal or identifiable information**.
 - Only total birth counts per name, year, and gender are used.
@@ -53,11 +52,6 @@ This format makes the data easy to inspect, extend, and reuse.
 - No backend required
 - Runs entirely in the browser
 
-The game can be hosted as a static site using:
-- GitHub Pages
-- Netlify
-- Any static hosting service
-
 ---
 
 ## 🚀 Running locally
@@ -79,9 +73,8 @@ The game can be hosted as a static site using:
 
 ## 📄 License
 
-This project is licensed under the **GNU General Public License v3.0**.
+This project is licensed under the **MIT License**.
 
-You are free to use, modify, and distribute this software under the terms of the GPL-3.0 license.  
-Any derivative work must also be distributed under the same license.
+You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of this software, subject to the conditions of the MIT License.
 
 See the `LICENSE` file for more details.
